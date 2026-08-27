@@ -14,6 +14,10 @@
 - Stage に宣言された exact broadcast name 用の汎用 `broadcastMessageAndWait` port を提供する。
 - Scratch VM への直接アクセスを狭い interface に閉じ込める。
 
+## 互換性
+
+既存 app が安定した app 固有 diagnostics を公開している場合は、`errorCodePrefix` を渡せます。たとえば `tm-kamishibai` は runtime interaction mechanics をこの package に委譲しつつ、`K4-BROADCAST-*` error を維持できます。
+
 ## 使用例
 
 ```ts
@@ -23,12 +27,14 @@ import {
 } from '@kubohiroya/turbowarp-runtime-host';
 
 const host = createTurboWarpRuntimeHost({Scratch});
+const broadcast = createTurboWarpBroadcastPort({
+  runtime: host.runtime,
+  errorCodePrefix: 'K4'
+});
 
 const dispose = host.onRuntimeEvent('PROJECT_STOP_ALL', () => {
   console.log('stopped');
 });
-
-const broadcast = createTurboWarpBroadcastPort({runtime: host.runtime});
 
 await broadcast.broadcastMessageAndWait(
   {message: 'openScene'},

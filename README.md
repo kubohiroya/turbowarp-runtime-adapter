@@ -14,6 +14,10 @@ This package intentionally does not define app-specific DSL semantics, block met
 - Provide a generic `broadcastMessageAndWait` port for exact Stage broadcast names.
 - Keep Scratch VM access behind a narrow interface.
 
+## Compatibility
+
+Consumers that already expose stable app-specific diagnostics can pass `errorCodePrefix`. For example, `tm-kamishibai` can keep `K4-BROADCAST-*` errors while delegating the runtime interaction mechanics to this package.
+
 ## Example
 
 ```ts
@@ -23,12 +27,14 @@ import {
 } from '@kubohiroya/turbowarp-runtime-host';
 
 const host = createTurboWarpRuntimeHost({Scratch});
+const broadcast = createTurboWarpBroadcastPort({
+  runtime: host.runtime,
+  errorCodePrefix: 'K4'
+});
 
 const dispose = host.onRuntimeEvent('PROJECT_STOP_ALL', () => {
   console.log('stopped');
 });
-
-const broadcast = createTurboWarpBroadcastPort({runtime: host.runtime});
 
 await broadcast.broadcastMessageAndWait(
   {message: 'openScene'},
