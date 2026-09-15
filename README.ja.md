@@ -4,7 +4,7 @@
 
 `@kubohiroya/turbowarp-runtime-adapter` は、unsandboxed extension や packaged TurboWarp app から TurboWarp runtime を操作するための、アプリ非依存の adapter を提供します。
 
-この package は、アプリ固有の DSL semantics、block metadata、story/navigation、pose、3D scene graph policy を定義しません。それらは `tm-kamishibai` や `tm-3d-app` などの app package 側に残します。
+この package は、アプリ固有の DSL semantics、block metadata、story/navigation、pose、3D scene graph policy を定義しません。それらは app package `@kubohiroya/turbowarp-kamishibai-app`（repository: `tm-kamishibai`）や domain library `@kubohiroya/turbowarp-3d-scene-dsl` 側に残します。
 
 ## 役割
 
