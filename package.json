@@ -1,18 +1,18 @@
 {
-  "name": "@kubohiroya/turbowarp-runtime-host",
+  "name": "@kubohiroya/turbowarp-runtime-adapter",
   "version": "0.2.0",
-  "description": "App-neutral host adapters for interacting with the TurboWarp runtime.",
+  "description": "App-neutral adapters for interacting with the TurboWarp runtime.",
   "author": "Hiroya Kubo <hiroya@cuc.ac.jp>",
   "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
-  "homepage": "https://github.com/kubohiroya/turbowarp-runtime-host#readme",
+  "homepage": "https://github.com/kubohiroya/turbowarp-runtime-adapter#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kubohiroya/turbowarp-runtime-host.git"
+    "url": "git+https://github.com/kubohiroya/turbowarp-runtime-adapter.git"
   },
   "bugs": {
-    "url": "https://github.com/kubohiroya/turbowarp-runtime-host/issues"
+    "url": "https://github.com/kubohiroya/turbowarp-runtime-adapter/issues"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -55,7 +55,6 @@
     "turbowarp",
     "scratch",
     "runtime",
-    "adapter",
-    "host"
+    "adapter"
   ]
 }

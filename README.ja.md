@@ -1,8 +1,8 @@
-# turbowarp-runtime-host
+# turbowarp-runtime-adapter
 
 [English](README.md)
 
-`@kubohiroya/turbowarp-runtime-host` は、unsandboxed extension や packaged TurboWarp app から TurboWarp runtime を操作するための、アプリ非依存の adapter を提供します。
+`@kubohiroya/turbowarp-runtime-adapter` は、unsandboxed extension や packaged TurboWarp app から TurboWarp runtime を操作するための、アプリ非依存の adapter を提供します。
 
 この package は、アプリ固有の DSL semantics、block metadata、story/navigation、pose、3D scene graph policy を定義しません。それらは `tm-kamishibai` や `tm-3d-app` などの app package 側に残します。
 
@@ -41,7 +41,7 @@ opcode 重複検出だけを所有します。opcode・block text・menu 項目�
 語彙はこの package に入りません。
 
 ```ts
-import {coerceScalarBlockValue, createBlockSurfaceBuilder} from '@kubohiroya/turbowarp-runtime-host';
+import {coerceScalarBlockValue, createBlockSurfaceBuilder} from '@kubohiroya/turbowarp-runtime-adapter';
 
 const build = createBlockSurfaceBuilder({ArgumentType, BlockType}, {visible: stateVisible});
 const surface = build.surface(
@@ -78,7 +78,7 @@ const written = coerceScalarBlockValue(args.VALUE, args.TYPE, {errorCodePrefix: 
 import {
   createTurboWarpBroadcastPort,
   createTurboWarpRuntimeHost
-} from '@kubohiroya/turbowarp-runtime-host';
+} from '@kubohiroya/turbowarp-runtime-adapter';
 
 const host = createTurboWarpRuntimeHost({Scratch});
 const broadcast = createTurboWarpBroadcastPort({
