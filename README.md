@@ -4,7 +4,7 @@
 
 `@kubohiroya/turbowarp-runtime-adapter` provides app-neutral adapters for interacting with the TurboWarp runtime from unsandboxed extensions and packaged TurboWarp apps.
 
-This package intentionally does not define app-specific DSL semantics, block metadata, story/navigation behavior, pose handling, or 3D scene graph policy. Those remain in app packages such as `tm-kamishibai` and `tm-3d-app`.
+This package intentionally does not define app-specific DSL semantics, block metadata, story/navigation behavior, pose handling, or 3D scene graph policy. Those remain in the app package `@kubohiroya/turbowarp-kamishibai-app` (repository: `tm-kamishibai`) or domain libraries such as `@kubohiroya/turbowarp-3d-scene-dsl`.
 
 ## Scope
 
