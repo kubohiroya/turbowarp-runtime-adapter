@@ -1,8 +1,8 @@
-# turbowarp-runtime-host
+# turbowarp-runtime-adapter
 
 [日本語](README.ja.md)
 
-`@kubohiroya/turbowarp-runtime-host` provides app-neutral adapters for interacting with the TurboWarp runtime from unsandboxed extensions and packaged TurboWarp apps.
+`@kubohiroya/turbowarp-runtime-adapter` provides app-neutral adapters for interacting with the TurboWarp runtime from unsandboxed extensions and packaged TurboWarp apps.
 
 This package intentionally does not define app-specific DSL semantics, block metadata, story/navigation behavior, pose handling, or 3D scene graph policy. Those remain in app packages such as `tm-kamishibai` and `tm-3d-app`.
 
@@ -41,7 +41,7 @@ reporter monitor defaults, and duplicate-opcode detection. Opcodes, block text, 
 with the caller, so no app vocabulary enters this package.
 
 ```ts
-import {coerceScalarBlockValue, createBlockSurfaceBuilder} from '@kubohiroya/turbowarp-runtime-host';
+import {coerceScalarBlockValue, createBlockSurfaceBuilder} from '@kubohiroya/turbowarp-runtime-adapter';
 
 const build = createBlockSurfaceBuilder({ArgumentType, BlockType}, {visible: stateVisible});
 const surface = build.surface(
@@ -78,7 +78,7 @@ Consumers that already expose stable app-specific diagnostics can pass `errorCod
 import {
   createTurboWarpBroadcastPort,
   createTurboWarpRuntimeHost
-} from '@kubohiroya/turbowarp-runtime-host';
+} from '@kubohiroya/turbowarp-runtime-adapter';
 
 const host = createTurboWarpRuntimeHost({Scratch});
 const broadcast = createTurboWarpBroadcastPort({
