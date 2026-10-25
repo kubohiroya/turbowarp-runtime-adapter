@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 - 2026-10-26
+
+- パッケージ名変更後の文書参照を整理したmainを公開します。
+- 0.2.0の公開APIと実行時動作を維持します。切り戻しは `@kubohiroya/turbowarp-runtime-adapter@0.2.0` へ固定します。
+
 ## 0.2.0
 
 - Add target enumeration to the runtime host: `targets()` returns a copy of every loaded target and `spriteTargets()` drops the Stage. An absent target list reads as empty; a non-array one is a runtime fault.
