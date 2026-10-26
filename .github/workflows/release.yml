@@ -1,0 +1,62 @@
+name: Finalize published release tags
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  finalize-published-tags:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Install OIDC-capable npm
+        run: npm install --global npm@11.21.0
+      - name: Verify published artifact and synchronize release tags
+        env:
+          RELEASE_PACKAGE: '@kubohiroya/turbowarp-runtime-adapter'
+          RELEASE_VERSION: '0.3.0'
+          RELEASE_SHA1: '703816983220c2c965e4d94c7fd08b523e7cff9f'
+        run: |
+          set -eu
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const {RELEASE_PACKAGE: name, RELEASE_VERSION: version, RELEASE_SHA1: sha1} = process.env;
+          const main = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          assert.equal(main.name, name, 'Unexpected package on main');
+          assert.equal(main.version, version, 'Main has advanced');
+          const npm = (...args) => execFileSync('npm', args, {encoding: 'utf8'});
+          const published = JSON.parse(npm('view', `${name}@${version}`, '--json', '--prefer-online'));
+          assert.equal(published.name, name);
+          assert.equal(published.version, version);
+          assert.equal(published.dist.shasum, sha1, 'Published artifact differs');
+          const readTags = () => JSON.parse(npm('view', name, 'dist-tags', '--json', '--prefer-online'));
+          const tags = readTags();
+          for (const tag of ['latest', 'next']) {
+            if (tags[tag] !== version) npm('dist-tag', 'add', `${name}@${version}`, tag);
+          }
+          let complete = false;
+          for (let attempt = 0; attempt < 30; attempt += 1) {
+            const actual = readTags();
+            if (actual.latest === version && actual.next === version) {
+              console.log(JSON.stringify({package: name, version, ...actual}));
+              complete = true;
+              break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+          assert(complete, 'Release tags have not converged');
+          NODE
