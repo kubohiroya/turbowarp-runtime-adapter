@@ -760,6 +760,9 @@ export interface DebuggerLogConsole {
 }
 
 export interface TurboWarpDebuggerLogOptions {
+  /** The runtime to write through. Without it, `Scratch.vm.runtime`, as `createTurboWarpRuntimeHost` resolves it. */
+  runtime?: unknown;
+  Scratch?: ScratchRuntimeHost;
   /** A name put in front of every entry, so entries from several extensions can be told apart. */
   source?: string;
   /**
@@ -767,55 +770,103 @@ export interface TurboWarpDebuggerLogOptions {
    * everything. `null` writes only to the debugger.
    */
   console?: DebuggerLogConsole | null;
-  /** Longest text of one debugger entry, in characters. Defaults to 1000. */
+  /** Longest text of one debugger entry, in characters (code points). Defaults to 1000. */
   maxLength?: number;
-}
-
-export interface TurboWarpDebuggerLogEntryOptions {
-  /** The thread the entry is about. The debugger then links the entry to the thread's current block. */
-  thread?: unknown;
+  /**
+   * Applied to the debugger's text, which the Logs tab can export. Defaults to
+   * `redactDebuggerLogText`. `null` keeps the text as it is. The console gets the original.
+   */
+  redact?: ((text: string) => string) | null;
 }
 
 export interface TurboWarpDebuggerLog {
   /** Whether the editor's debugger add-on is on and takes entries. */
   available(): boolean;
-  /** Each returns true when the entry reached the debugger. */
-  log(message: string, detail?: unknown, options?: TurboWarpDebuggerLogEntryOptions): boolean;
-  warn(message: string, detail?: unknown, options?: TurboWarpDebuggerLogEntryOptions): boolean;
-  error(message: string, detail?: unknown, options?: TurboWarpDebuggerLogEntryOptions): boolean;
+  /**
+   * Each returns true when the entry reached the debugger. An entry is not linked to a block: the
+   * add-on previews the first input of a linked block and fails on most blocks that are not its
+   * own log blocks (a number input, for one), which stops the whole Logs list from drawing.
+   */
+  log(message: string, detail?: unknown): boolean;
+  warn(message: string, detail?: unknown): boolean;
+  error(message: string, detail?: unknown): boolean;
 }
+
+// The add-on names its blocks with zero-width spaces so that they cannot clash with a project's own.
+const zeroWidthSpace = '\u200B\u200B';
 
 /** The procedure codes of the debugger add-on's log blocks. */
 export const debuggerLogProcedureCodes: Readonly<Record<DebuggerLogLevel, string>> = Object.freeze({
-  log: '​​log​​ %s',
-  warn: '​​warn​​ %s',
-  error: '​​error​​ %s',
+  log: `${zeroWidthSpace}log${zeroWidthSpace} %s`,
+  warn: `${zeroWidthSpace}warn${zeroWidthSpace} %s`,
+  error: `${zeroWidthSpace}error${zeroWidthSpace} %s`,
 });
 
-function isThreadLike(value: unknown) {
-  const thread = value as {peekStack?: unknown; target?: {id?: unknown} | null} | null;
-  return (
-    typeof thread?.peekStack === 'function' &&
-    typeof thread.target === 'object' &&
-    thread.target !== null
-  );
+/**
+ * Hide what should not leave the machine in a log the Logs tab can export: a URL keeps only its
+ * origin and path, a local file path becomes `[local path]`, and a credential after `token=`,
+ * `password:` and the like becomes `[redacted]`.
+ */
+export function redactDebuggerLogText(text: string): string {
+  return text
+    .replace(/https?:\/\/[^\s<>"']+/gu, (address) => {
+      try {
+        const url = new URL(address);
+        return `${url.origin}${url.pathname}`;
+      } catch {
+        return '[URL]';
+      }
+    })
+    .replace(
+      /(?:file:\/\/|[A-Za-z]:\\|\/(?:Users|home|private|tmp|var|Volumes)\/)[^\s"'<>]*/gu,
+      '[local path]',
+    )
+    .replace(
+      /\b(token|password|secret|authorization|api[_-]?key)\s*[:=]\s*[^\s,;]+/giu,
+      '$1=[redacted]',
+    );
 }
 
-function detailText(detail: unknown): string {
+// JSON of at most about `budget` characters. Values past the budget are left out, so a large
+// record is not turned into a long string only to be cut.
+function boundedJson(detail: unknown, budget: number): string {
+  let used = 0;
+  let cut = false;
+  try {
+    const json = JSON.stringify(detail, (key: string, value: unknown) => {
+      if (used > budget) {
+        cut = true;
+        return undefined;
+      }
+      used += key.length + (typeof value === 'string' ? value.length : 8);
+      return value;
+    });
+    return json === undefined ? '' : `${json}${cut ? '…' : ''}`;
+  } catch {
+    return String(detail);
+  }
+}
+
+function detailText(detail: unknown, budget: number): string {
   if (detail === undefined || detail === null) return '';
   if (typeof detail === 'string') return detail;
   if (typeof detail === 'number' || typeof detail === 'boolean') return String(detail);
   const record = detail as {name?: unknown; code?: unknown; message?: unknown};
   if (typeof record.message === 'string' || detail instanceof Error) {
-    const name = typeof record.name === 'string' && record.name !== 'Error' ? `${record.name}: ` : '';
+    const name = typeof record.name === 'string' && record.name !== 'Error' ? record.name : '';
+    const message = String(record.message ?? '');
     const code = typeof record.code === 'string' && record.code ? ` [${record.code}]` : '';
-    return `${name}${String(record.message ?? '')}${code}`;
+    return `${name && message ? `${name}: ` : name}${message}${code}`;
   }
-  try {
-    return JSON.stringify(detail) ?? '';
-  } catch {
-    return String(detail);
-  }
+  return boundedJson(detail, budget);
+}
+
+function shorten(text: string, maxLength: number) {
+  if (text.length <= maxLength) return text;
+  // Count code points, so a cut never leaves half of a surrogate pair.
+  const characters = Array.from(text);
+  if (characters.length <= maxLength) return text;
+  return `${characters.slice(0, Math.max(0, maxLength - 1)).join('')}…`;
 }
 
 /**
@@ -824,44 +875,41 @@ function detailText(detail: unknown): string {
  *
  * Entries go through the add-on's own log, warn and error blocks (`runtime.getAddonBlock`), so
  * neither the VM nor the GUI needs a new interface. Without the add-on (a player, the packager,
- * plain TurboWarp with the add-on off) an entry only goes to the console.
+ * plain TurboWarp with the add-on off) or without a runtime, an entry only goes to the console.
+ * A runtime that is given must be one: anything else throws `TWRH-RUNTIME-001`.
  */
 export function createTurboWarpDebuggerLog(
-  runtime: unknown,
   options: TurboWarpDebuggerLogOptions = {},
 ): TurboWarpDebuggerLog {
-  const target = runtime as DebuggerLogRuntimeLike | null | undefined;
+  const candidate = options.runtime ?? options.Scratch?.vm?.runtime;
+  const runtime =
+    candidate === undefined || candidate === null
+      ? null
+      : (validateRuntime(candidate) as unknown as DebuggerLogRuntimeLike);
   const output = options.console === undefined ? console : options.console;
   const prefix = options.source ? `[${options.source}] ` : '';
   const maxLength = options.maxLength ?? 1000;
+  const redact = options.redact === undefined ? redactDebuggerLogText : options.redact;
   const block = (level: DebuggerLogLevel) => {
     try {
-      return target?.getAddonBlock?.(debuggerLogProcedureCodes[level]);
+      return runtime?.getAddonBlock?.(debuggerLogProcedureCodes[level]);
     } catch {
       return undefined;
     }
   };
 
-  const write = (
-    level: DebuggerLogLevel,
-    message: string,
-    detail: unknown,
-    entry?: TurboWarpDebuggerLogEntryOptions,
-  ) => {
+  const write = (level: DebuggerLogLevel, message: string, detail: unknown) => {
     if (output) {
       if (detail === undefined) output[level](`${prefix}${message}`);
       else output[level](`${prefix}${message}`, detail);
     }
     const logBlock = block(level);
     if (!logBlock) return false;
-    const detailPart = detailText(detail);
-    let text = `${prefix}${message}${detailPart ? ` ${detailPart}` : ''}`;
-    if (text.length > maxLength) text = `${text.slice(0, Math.max(0, maxLength - 1))}…`;
     try {
-      logBlock.callback(
-        {content: text},
-        {thread: isThreadLike(entry?.thread) ? entry?.thread : undefined},
-      );
+      const detailPart = detailText(detail, maxLength);
+      let text = `${prefix}${message}${detailPart ? ` ${detailPart}` : ''}`;
+      if (redact) text = redact(text);
+      logBlock.callback({content: shorten(text, maxLength)}, {thread: undefined});
       return true;
     } catch {
       // The debugger cannot take the entry. The console already has it.
@@ -871,11 +919,8 @@ export function createTurboWarpDebuggerLog(
 
   return Object.freeze({
     available: () => Boolean(block('log')),
-    log: (message: string, detail?: unknown, entry?: TurboWarpDebuggerLogEntryOptions) =>
-      write('log', message, detail, entry),
-    warn: (message: string, detail?: unknown, entry?: TurboWarpDebuggerLogEntryOptions) =>
-      write('warn', message, detail, entry),
-    error: (message: string, detail?: unknown, entry?: TurboWarpDebuggerLogEntryOptions) =>
-      write('error', message, detail, entry),
+    log: (message: string, detail?: unknown) => write('log', message, detail),
+    warn: (message: string, detail?: unknown) => write('warn', message, detail),
+    error: (message: string, detail?: unknown) => write('error', message, detail),
   });
 }
