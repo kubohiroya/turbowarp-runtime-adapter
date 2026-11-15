@@ -13,6 +13,7 @@
 - 小さく検証された host adapter 経由で hats を起動する。
 - Stage target、sprite target、renderer、monitor store を読む。
 - Stage に宣言された exact broadcast name 用の汎用 `broadcastMessageAndWait` port を提供する。
+- 機能拡張の警告とエラーを、エディターのデバッガーの Logs タブへ書く。
 - extension の `getInfo()` block list のうち定型部分を組み立てる。
 - Scratch VM への直接アクセスを狭い interface に閉じ込める。
 
@@ -67,6 +68,21 @@ const surface = build.surface(
 
 const written = coerceScalarBlockValue(args.VALUE, args.TYPE, {errorCodePrefix: 'K4'});
 ```
+
+## デバッガーのログ
+
+`createTurboWarpDebuggerLog(runtime, {source})` は、機能拡張の警告とエラーを、エディターのデバッガーアドオンの Logs タブへ書く。これを使うすべての機能拡張と、作品自身のログブロックの出力が、同じ場所に並ぶ。各行の先頭には `[source]` を付ける。
+
+```js
+const log = createTurboWarpDebuggerLog(Scratch.vm.runtime, {source: 'My extension'});
+log.warn('Camera unavailable.', error);
+log.error('Playback failed.', error, {thread: util.thread}); // 実行中のブロックに結び付ける
+```
+
+- `log`・`warn`・`error` は、メッセージ、省略できる詳細（`Error` は `名前: メッセージ [code]`、普通のオブジェクトは JSON）、省略できるスレッドを受け取る。デバッガーに届いたかどうかを返す。
+- 同じ内容は常にコンソールにも出す。詳細は別の引数で渡すので、開発者ツールではスタックも見られる。デバッガーだけに書くときは `console: null` を渡す。
+- 書き込みにはアドオン自身の log・warn・error ブロック（`runtime.getAddonBlock`）を使う。VM と GUI に新しい口は要らない。アドオンがない環境（プレイヤー、パッケージャー、アドオンを切ったとき）では `available()` が false になり、コンソールにだけ出る。
+- `maxLength` 文字（既定は 1000）を超える行は切り詰める。
 
 ## 互換性
 

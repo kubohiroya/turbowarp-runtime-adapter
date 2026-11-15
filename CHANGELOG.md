@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `createTurboWarpDebuggerLog` を追加。機能拡張の警告とエラーを、エディターのデバッガーアドオンの Logs タブへ書く（コンソールにも出す）。アドオンの log・warn・error ブロックを使うので、VM と GUI は変更しない。既存の公開 API の動作は変えない。
+
 ## 0.4.0
 
 - Node.js 26・pnpm 11.28.8の検証済みツールチェーンとTrusted Publisherリリースに追従。

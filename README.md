@@ -14,6 +14,7 @@ This package intentionally does not define app-specific DSL semantics, block met
 - Read the Stage target, the sprite targets, the renderer, and the monitor stores.
 - Provide a generic `broadcastMessageAndWait` port for exact Stage broadcast names.
 - Build the repetitive parts of an extension `getInfo()` block list.
+- Write extension warnings and errors to the Logs tab of the editor's debugger.
 - Keep Scratch VM access behind a narrow interface.
 
 ## Runtime surface
@@ -67,6 +68,21 @@ const surface = build.surface(
 
 const written = coerceScalarBlockValue(args.VALUE, args.TYPE, {errorCodePrefix: 'K4'});
 ```
+
+## Debugger log
+
+`createTurboWarpDebuggerLog(runtime, {source})` writes an extension's warnings and errors to the Logs tab of the editor's debugger add-on, where every extension using it and the project's own log blocks show together. Each entry starts with `[source]`.
+
+```js
+const log = createTurboWarpDebuggerLog(Scratch.vm.runtime, {source: 'My extension'});
+log.warn('Camera unavailable.', error);
+log.error('Playback failed.', error, {thread: util.thread}); // links the entry to the running block
+```
+
+- `log`, `warn` and `error` take a message, an optional detail (an `Error` becomes `Name: message [code]`, a plain object JSON) and an optional thread. Each returns whether the entry reached the debugger.
+- The entry always goes to the console too, with the detail as a separate argument, so developer tools keep the stack. Pass `console: null` to write only to the debugger.
+- Entries go through the add-on's own log, warn and error blocks (`runtime.getAddonBlock`), so the VM and the GUI need no new interface. Without the add-on (a player, the packager, the add-on turned off) `available()` is false and entries only reach the console.
+- An entry longer than `maxLength` characters (1000 by default) is shortened.
 
 ## Compatibility
 

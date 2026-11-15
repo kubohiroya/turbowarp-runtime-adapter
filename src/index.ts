@@ -743,3 +743,139 @@ export function coerceScalarBlockValue(
   }
   return Object.freeze({ok: false as const, code: prefixedCode(prefix, 'VARIABLE-WRITE-TYPE')});
 }
+
+export type DebuggerLogLevel = 'log' | 'warn' | 'error';
+
+/** The slice of the runtime the debugger log reaches through: the editor add-ons' blocks. */
+export interface DebuggerLogRuntimeLike {
+  getAddonBlock?: (
+    procedureCode: string,
+  ) => {callback(args: Record<string, unknown>, util: {thread?: unknown}): unknown} | undefined;
+}
+
+export interface DebuggerLogConsole {
+  log(...data: unknown[]): void;
+  warn(...data: unknown[]): void;
+  error(...data: unknown[]): void;
+}
+
+export interface TurboWarpDebuggerLogOptions {
+  /** A name put in front of every entry, so entries from several extensions can be told apart. */
+  source?: string;
+  /**
+   * Where an entry also goes. Defaults to the global `console`, so developer tools keep showing
+   * everything. `null` writes only to the debugger.
+   */
+  console?: DebuggerLogConsole | null;
+  /** Longest text of one debugger entry, in characters. Defaults to 1000. */
+  maxLength?: number;
+}
+
+export interface TurboWarpDebuggerLogEntryOptions {
+  /** The thread the entry is about. The debugger then links the entry to the thread's current block. */
+  thread?: unknown;
+}
+
+export interface TurboWarpDebuggerLog {
+  /** Whether the editor's debugger add-on is on and takes entries. */
+  available(): boolean;
+  /** Each returns true when the entry reached the debugger. */
+  log(message: string, detail?: unknown, options?: TurboWarpDebuggerLogEntryOptions): boolean;
+  warn(message: string, detail?: unknown, options?: TurboWarpDebuggerLogEntryOptions): boolean;
+  error(message: string, detail?: unknown, options?: TurboWarpDebuggerLogEntryOptions): boolean;
+}
+
+/** The procedure codes of the debugger add-on's log blocks. */
+export const debuggerLogProcedureCodes: Readonly<Record<DebuggerLogLevel, string>> = Object.freeze({
+  log: '​​log​​ %s',
+  warn: '​​warn​​ %s',
+  error: '​​error​​ %s',
+});
+
+function isThreadLike(value: unknown) {
+  const thread = value as {peekStack?: unknown; target?: {id?: unknown} | null} | null;
+  return (
+    typeof thread?.peekStack === 'function' &&
+    typeof thread.target === 'object' &&
+    thread.target !== null
+  );
+}
+
+function detailText(detail: unknown): string {
+  if (detail === undefined || detail === null) return '';
+  if (typeof detail === 'string') return detail;
+  if (typeof detail === 'number' || typeof detail === 'boolean') return String(detail);
+  const record = detail as {name?: unknown; code?: unknown; message?: unknown};
+  if (typeof record.message === 'string' || detail instanceof Error) {
+    const name = typeof record.name === 'string' && record.name !== 'Error' ? `${record.name}: ` : '';
+    const code = typeof record.code === 'string' && record.code ? ` [${record.code}]` : '';
+    return `${name}${String(record.message ?? '')}${code}`;
+  }
+  try {
+    return JSON.stringify(detail) ?? '';
+  } catch {
+    return String(detail);
+  }
+}
+
+/**
+ * A log that writes to the Logs tab of the editor's debugger add-on, so the warnings and errors of
+ * every extension show in one place next to the project's own log blocks.
+ *
+ * Entries go through the add-on's own log, warn and error blocks (`runtime.getAddonBlock`), so
+ * neither the VM nor the GUI needs a new interface. Without the add-on (a player, the packager,
+ * plain TurboWarp with the add-on off) an entry only goes to the console.
+ */
+export function createTurboWarpDebuggerLog(
+  runtime: unknown,
+  options: TurboWarpDebuggerLogOptions = {},
+): TurboWarpDebuggerLog {
+  const target = runtime as DebuggerLogRuntimeLike | null | undefined;
+  const output = options.console === undefined ? console : options.console;
+  const prefix = options.source ? `[${options.source}] ` : '';
+  const maxLength = options.maxLength ?? 1000;
+  const block = (level: DebuggerLogLevel) => {
+    try {
+      return target?.getAddonBlock?.(debuggerLogProcedureCodes[level]);
+    } catch {
+      return undefined;
+    }
+  };
+
+  const write = (
+    level: DebuggerLogLevel,
+    message: string,
+    detail: unknown,
+    entry?: TurboWarpDebuggerLogEntryOptions,
+  ) => {
+    if (output) {
+      if (detail === undefined) output[level](`${prefix}${message}`);
+      else output[level](`${prefix}${message}`, detail);
+    }
+    const logBlock = block(level);
+    if (!logBlock) return false;
+    const detailPart = detailText(detail);
+    let text = `${prefix}${message}${detailPart ? ` ${detailPart}` : ''}`;
+    if (text.length > maxLength) text = `${text.slice(0, Math.max(0, maxLength - 1))}…`;
+    try {
+      logBlock.callback(
+        {content: text},
+        {thread: isThreadLike(entry?.thread) ? entry?.thread : undefined},
+      );
+      return true;
+    } catch {
+      // The debugger cannot take the entry. The console already has it.
+      return false;
+    }
+  };
+
+  return Object.freeze({
+    available: () => Boolean(block('log')),
+    log: (message: string, detail?: unknown, entry?: TurboWarpDebuggerLogEntryOptions) =>
+      write('log', message, detail, entry),
+    warn: (message: string, detail?: unknown, entry?: TurboWarpDebuggerLogEntryOptions) =>
+      write('warn', message, detail, entry),
+    error: (message: string, detail?: unknown, entry?: TurboWarpDebuggerLogEntryOptions) =>
+      write('error', message, detail, entry),
+  });
+}
