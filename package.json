@@ -1,6 +1,6 @@
 {
   "name": "@kubohiroya/turbowarp-runtime-adapter",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "App-neutral adapters for interacting with the TurboWarp runtime.",
   "author": {
     "name": "Hiroya Kubo",

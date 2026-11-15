@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
 - `createTurboWarpDebuggerLog` と `redactDebuggerLogText` を追加。機能拡張の警告とエラーを、エディターのデバッガーアドオンの Logs タブへ書く（コンソールにも出す）。アドオンの log・warn・error ブロックを使うので、VM と GUI は変更しない。書き出せる Logs には URL のクエリー・ローカルのパス・資格情報を伏せて渡す。行はブロックに結び付けない（アドオンのプレビューが多くのブロックで失敗し、一覧が描かれなくなるため）。既存の公開 API の動作は変えない。
 
